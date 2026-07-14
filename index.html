@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hat Studio — 3D Hat Customizer & AR Try-On</title>
+  <meta name="description" content="Design your own hat in 3D — six styles from baseball cap to beret, cotton/wool/denim/leather materials, live PBR previews, adjustable brim curve — then try it on your head with webcam AR face tracking." />
+  <link rel="canonical" href="https://hat.qiaomu.ai/" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧢</text></svg>" />
+
+  <!-- Open Graph / Twitter -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Hat Studio — 3D Hat Customizer & AR Try-On" />
+  <meta property="og:description" content="Customize six hat styles and four fabrics in live 3D, then try them on your head with webcam AR face tracking." />
+  <meta property="og:url" content="https://hat.qiaomu.ai/" />
+  <meta property="og:image" content="https://hat.qiaomu.ai/og-cover.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <!-- Umami analytics -->
+  <script defer src="https://umami.qiaomu.ai/script.js" data-website-id="954dce90-b670-4d41-a787-5afc286cdbca" data-domains="hat.qiaomu.ai"></script>
+
+  <link rel="stylesheet" href="./styles.css" />
+
+  <!-- Three.js via import map (vendored locally — no CDN dependency) -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three.module.js",
+      "three/addons/": "./vendor/"
+    }
+  }
+  </script>
+
+  <!-- MediaPipe face tracking (vendored locally, global scripts for the AR try-on mode) -->
+  <script src="./vendor/face_mesh/face_mesh.js"></script>
+  <script src="./vendor/face_mesh/camera_utils.js"></script>
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark"></span>
+        <div class="brand-text">
+          <h1>Hat Studio</h1>
+          <p>3D Hat Customizer</p>
+        </div>
+      </div>
+      <nav class="mode-switch" role="tablist" aria-label="Mode">
+        <button id="mode-customize" class="mode-btn is-active" role="tab" aria-selected="true">Customize</button>
+        <button id="mode-tryon" class="mode-btn" role="tab" aria-selected="false">Try On</button>
+      </nav>
+    </header>
+
+    <main class="stage-wrap">
+      <!-- ============ CUSTOMIZER VIEW ============ -->
+      <section id="viewer" class="viewer" aria-label="3D customizer">
+        <canvas id="scene"></canvas>
+        <div class="viewer-hud">
+          <span class="hud-pill">hover&nbsp;to&nbsp;glow</span>
+          <span class="hud-pill ghost">drag&nbsp;to&nbsp;orbit</span>
+        </div>
+        <div class="loader" id="loader"><div class="spinner"></div><span>Building your hat…</span></div>
+      </section>
+
+      <!-- ============ TRY-ON (WEBCAM AR) VIEW ============ -->
+      <section id="tryon" class="tryon" hidden aria-label="Webcam try-on">
+        <div class="ar-stage">
+          <video id="cam" playsinline muted autoplay></video>
+          <canvas id="ar"></canvas>
+          <div class="ar-status" id="ar-status">Starting camera…</div>
+          <div class="ar-badge">LIVE · face tracking</div>
+          <div class="ar-toast" id="ar-toast"></div>
+          <div class="ar-hint">◂ swipe to switch hat ▸</div>
+        </div>
+      </section>
+
+      <!-- ============ CONTROL PANEL ============ -->
+      <aside class="panel" aria-label="Controls">
+        <div class="panel-scroll">
+          <!-- Hat -->
+          <section class="ctrl-group">
+            <h2 class="ctrl-title">Hat</h2>
+            <div class="seg seg-grid" id="hat-style" role="group" aria-label="Hat style">
+              <button data-value="cap" class="seg-btn is-active">Cap</button>
+              <button data-value="snapback" class="seg-btn">Snapback</button>
+              <button data-value="beanie" class="seg-btn">Beanie</button>
+              <button data-value="bucket" class="seg-btn">Bucket</button>
+              <button data-value="fedora" class="seg-btn">Fedora</button>
+              <button data-value="beret" class="seg-btn">Beret</button>
+            </div>
+            <div class="seg" id="hat-material" role="group" aria-label="Hat material">
+              <button data-value="cotton" class="seg-btn is-active">Cotton</button>
+              <button data-value="wool" class="seg-btn">Wool</button>
+              <button data-value="denim" class="seg-btn">Denim</button>
+              <button data-value="leather" class="seg-btn">Leather</button>
+            </div>
+            <div class="swatches" id="hat-swatches"></div>
+            <label class="color-field">
+              <span>Custom color</span>
+              <input type="color" id="hat-color" value="#1f3a5f" />
+            </label>
+          </section>
+
+          <!-- Brim -->
+          <section class="ctrl-group">
+            <h2 class="ctrl-title">Brim</h2>
+            <label class="slider-field">
+              <span>Brim curve <em id="v-brim">45%</em></span>
+              <input type="range" id="brim-curve" min="0" max="100" value="45" />
+            </label>
+            <p class="hint">Caps curve down, buckets flare out, fedoras dip at the edge.</p>
+          </section>
+
+          <!-- Gesture -->
+          <section class="ctrl-group">
+            <h2 class="ctrl-title">Gesture</h2>
+            <button id="tip-hat" class="big-btn">
+              <span class="big-btn-label">Tip hat 👋</span>
+            </button>
+            <p class="hint">Hover the hat on the model to make it glow.</p>
+          </section>
+
+          <!-- View -->
+          <section class="ctrl-group">
+            <h2 class="ctrl-title">View</h2>
+            <div class="row-btns">
+              <button id="reset-view" class="ghost-btn">Reset view</button>
+              <button id="autorotate" class="ghost-btn" aria-pressed="false">Auto-rotate</button>
+            </div>
+          </section>
+
+          <!-- Try on CTA -->
+          <section class="ctrl-group">
+            <button id="tryon-cta" class="cta-btn">Try it on ▸</button>
+          </section>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    // Graceful notice if the 3D libraries fail to load (e.g. offline).
+    window.addEventListener("DOMContentLoaded", () => {
+      setTimeout(() => {
+        const l = document.getElementById("loader");
+        if (l && !l.classList.contains("is-hidden")) {
+          l.innerHTML = "<span>Couldn't load the 3D libraries.<br>Check your connection and reload.</span>";
+        }
+      }, 15000);
+    });
+  </script>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
