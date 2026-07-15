@@ -79,7 +79,7 @@ export function initTryOn(video, canvas, state, setStatus, onCycleStyle) {
       for (let i = 0; i < VERTS; i++) {
         positions[i * 3] = (lm[i].x - 0.5) * visibleW;
         positions[i * 3 + 1] = (0.5 - lm[i].y) * visibleH;
-        positions[i * 3 + 2] = -(lm[i].z - zRef) * visibleW - 0.12;
+        positions[i * 3 + 2] = -(lm[i].z - zRef) * visibleW - 0.08;
       }
       if (!primed) {
         smooth.set(positions);
@@ -145,7 +145,7 @@ export function initTryOn(video, canvas, state, setStatus, onCycleStyle) {
 
     // scale from temple-to-temple width vs. the hat's head-band width
     const templeWorld = Math.abs(wX(lm[IDX.rightTemple].x) - wX(lm[IDX.leftTemple].x));
-    const scale = (templeWorld / hat.headWidth) * 1.04;
+    const scale = (templeWorld / hat.headWidth) * 1.06;
 
     // yaw/pitch from the 3D face normal (z ≈ depth toward the camera).
     const P = (i) => new THREE.Vector3(lm[i].x, -lm[i].y, -lm[i].z);
@@ -157,9 +157,10 @@ export function initTryOn(video, canvas, state, setStatus, onCycleStyle) {
     const yaw = THREE.MathUtils.clamp(Math.atan2(normal.x, normal.z), -0.7, 0.7);
     const pitch = THREE.MathUtils.clamp(-Math.atan2(normal.y, normal.z), -0.6, 0.6);
 
-    // Anchor: hat band sits on the forehead, centred between the temples.
+    // Anchor: the hat band sits at brow level (below the hairline landmark),
+    // centred between the temples — worn on the head, not floating above it.
     tgt.x = wX((eyeMidX + templeMidX) / 2);
-    tgt.y = wY(lm[IDX.forehead].y) + 0.42 * scale;
+    tgt.y = wY(lm[IDX.forehead].y) - 0.26 * templeWorld;
     tgt.scale = scale;
     tgt.roll = roll;
     tgt.yaw = yaw;
@@ -168,12 +169,14 @@ export function initTryOn(video, canvas, state, setStatus, onCycleStyle) {
     tgt.tw = templeWorld;
 
     // Head ellipsoid: centred on the skull, sized from the temple width.
+    // Slightly smaller than the crown so it hides the back of the hat on
+    // turns without clipping the front.
     headTgt.x = tgt.x;
     headTgt.y = wY(lm[IDX.forehead].y) - 0.3 * templeWorld;
     headTgt.z = -0.25 * templeWorld;
-    headTgt.rx = templeWorld * 0.54;
+    headTgt.rx = templeWorld * 0.52;
     headTgt.ry = templeWorld * 0.66;
-    headTgt.rz = templeWorld * 0.6;
+    headTgt.rz = templeWorld * 0.55;
   }
 
   /* ---------------- swipe left/right to switch hat style ---------------- */
